@@ -1,4 +1,8 @@
 var myCar;
+var score = 0;
+var gameStartTime = 0;
+var obstacles = []; // Масив для зберігання перешкод
+var lastSpawnTime = 0; // Час останнього створення перешкоди
 
 var myGameArea = {
     canvas : document.createElement("canvas"),
@@ -14,6 +18,16 @@ var myGameArea = {
     update : function() {
         this.clear();
         myCar.update();
+
+        // Малюємо всі перешкоди
+        for (let obstacle of obstacles) {
+            obstacle.update();
+        }
+
+        // Відображаємо рахунок
+        this.context.fillStyle = "#000";
+        this.context.font = "20px Arial";
+        this.context.fillText("Рахунок: " + score, 10, 30);
     }
 }
 
@@ -130,6 +144,72 @@ class Car {
     }
 }
 
+class WheelObstacle {
+    constructor(x, y, radius = 15) {
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.color = "#333"; // Темно-сірий колір для шин
+    }
+
+    update() {
+        const ctx = myGameArea.context;
+
+        // Малюємо колесо як круг
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+
+        // Малюємо обід колеса
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 0.7, 0, 2 * Math.PI);
+        ctx.fillStyle = "#666";
+        ctx.fill();
+
+        // Малюємо центр колеса
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 0.3, 0, 2 * Math.PI);
+        ctx.fillStyle = "#999";
+        ctx.fill();
+    }
+
+    // Перевірка зіткнення з прямокутником (машинкою)
+    collidesWith(car) {
+        // Спрощена перевірка зіткнення між кругом і прямокутником
+        const carLeft = car.x;
+        const carRight = car.x + car.width;
+        const carTop = car.y;
+        const carBottom = car.y + car.height;
+
+        // Знаходимо найближчу точку прямокутника до центру колеса
+        const closestX = Math.max(carLeft, Math.min(this.x, carRight));
+        const closestY = Math.max(carTop, Math.min(this.y, carBottom));
+
+        // Обчислюємо відстань від центру колеса до найближчої точки
+        const distanceX = this.x - closestX;
+        const distanceY = this.y - closestY;
+        const distance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
+
+        return distance < this.radius;
+    }
+}
+
+// Функція для створення нових перешкод
+function spawnObstacle() {
+    const x = Math.random() * (myGameArea.canvas.width - 30) + 15; // Випадкова позиція X
+    const y = Math.random() * (myGameArea.canvas.height - 30) + 15; // Випадкова позиція Y
+    const obstacle = new WheelObstacle(x, y);
+    obstacles.push(obstacle);
+}
+
+// Функція для оновлення рахунку ( +1 очко за секунду )
+function updateScore() {
+    const currentTime = Date.now();
+    const elapsedSeconds = Math.floor((currentTime - gameStartTime) / 1000);
+    score = elapsedSeconds;
+}
+
 // Система керування автомобілем
 const keys = {
     up: false,
@@ -204,6 +284,26 @@ document.addEventListener('keyup', (event) => {
 
 // Головний цикл гри
 function gameLoop() {
+    // Оновлюємо рахунок
+    updateScore();
+
+    // Створюємо нові перешкоди кожні 2 секунди
+    const currentTime = Date.now();
+    if (currentTime - lastSpawnTime > 2000) {
+        spawnObstacle();
+        lastSpawnTime = currentTime;
+    }
+
+    // Перевіряємо зіткнення з перешкодами
+    for (let obstacle of obstacles) {
+        if (obstacle.collidesWith(myCar)) {
+            // Гра закінчується при зіткненні
+            alert("Гра закінчена! Ваш рахунок: " + score);
+            window.location.reload(); // Перезавантажуємо гру
+            return;
+        }
+    }
+
     // Обробляємо натиснуті клавіші
     if (keys.up) {
         myCar.accelerate();
@@ -217,10 +317,10 @@ function gameLoop() {
     if (keys.right) {
         myCar.turnRight();
     }
-    
+
     // Оновлюємо гру
     myGameArea.update();
-    
+
     // Запускаємо наступний кадр
     requestAnimationFrame(gameLoop);
 }
@@ -228,6 +328,7 @@ function gameLoop() {
 // Запускаємо ігровий цикл
 window.onload = () => {
     myGameArea.start();
-    myCar = new Car(40, 20, "red", 240, 200);
+    myCar = new Car(40, 20, "purple", 240, 200);
+    gameStartTime = Date.now(); // Запускаємо таймер гри
     gameLoop();
 }
